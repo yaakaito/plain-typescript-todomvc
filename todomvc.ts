@@ -143,6 +143,48 @@ module TodoMVC {
     }
   }
 
+  module View {
+    export class Base {
+
+      childNode : any   = null;
+      children : any[]  = [];
+
+      update(parent : any) : void {
+        this.render(parent);
+        for (var i = 0, l = this.children.length; i < l; i++) {
+          this.children[i].update(this.childNode);
+        }
+      }
+
+      render(parent : any) : void {
+        return;
+      }
+    }
+
+    export class Todo extends Base{
+
+      todo : Model.Todo = null;
+
+      render(parent : any) : void {
+        var attrs = this.todo.attributes;
+        var element = document.createElement('li');
+        if (attrs.completed) {
+          element.className = 'complete';
+        }
+        element.innerHTML = attrs.title;
+
+        parent.appendChild(element);
+      }
+    }
+
+    export class TodoList extends Base {
+
+      render(parent : any) : void {
+
+      }
+    }
+  }
+
   export class Application {
     run() : void {
       var rootController = new Controller.Root();
