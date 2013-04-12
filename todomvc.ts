@@ -17,6 +17,13 @@ module TodoMVC {
       }
     }
 
+    export module Attributes {
+      export interface Todo {
+        title : string;
+        completed : bool;
+      }
+    }
+
     export class Todo extends Base {
       private title : string    = 'untitled';
       private completed : bool  = false;
@@ -36,7 +43,7 @@ module TodoMVC {
         }
       }
 
-      attributes() : Object {
+      attributes() : Attributes.Todo {
         return {
           'title'     : this.title,
           'completed' : this.completed
@@ -54,6 +61,14 @@ module TodoMVC {
         this.models.push(model);
         console.log('pushed : ' + JSON.stringify(model.attributes()) );
       }
+
+      length() : number {
+        return this.models.length;
+      }
+
+      atIndex(index : number) : any {
+        return this.models[index];
+      }
     }
 
     export class Todo extends Base {
@@ -66,17 +81,33 @@ module TodoMVC {
   module Controller {
     
     export class Base {
+      view     : View.Base = null;
       children : any[] = [];
+      private parentView : View.Base = null;
 
-      display() : void {
-        
+      constructor {
+        this.view = new View.Base();
+      }
+
+      init() : void {
         this.setup();
-        this.render();
-
         for (var i = 0, l = this.children.length; i < l; i++) {
-          this.children[i].display();
+          this.children[i].init();
+        }
+      }
+ 
+      display(parent? : View.Base) : void {
+        if (arguments.length == 0) {
+          this.view.renderWithRoot();
+        }
+        else {
+          this.view.render(parent);
+          this.parentView = parent;
         }
 
+        for (var i = 0, l = this.children.length; i < l; i++) {
+          this.children[i].display(this.view);
+        }
       }
 
       render() : void {
@@ -95,7 +126,9 @@ module TodoMVC {
     export class Header extends Base {
 
       newTodo : any = document.getElementById('new-todo');
-
+      // fetch events
+      listController : TodoList = null;
+ 
       setup() : void {
         // add events
         this.addListener('keyup', '#new-todo', this.addNewTodo);
@@ -110,6 +143,9 @@ module TodoMVC {
         this.newTodo.value = '';
         var todo = new Model.Todo(title, false);
         Store.Todos.append(todo);
+
+        this.listController.display();
+
       }
     }
 
@@ -123,19 +159,21 @@ module TodoMVC {
     export class TodoList extends Base {
 
       setup() : void {
-        // load from local storage
-        // add events
+        this.view = new View.TodoList();
       }
     }
 
     export class Root extends Base {
 
       constructor() {
+
         super()
 
         var header = new Header();
         var todoList = new TodoList();
         var footer = new Footer();
+
+        header.listController = todoList;
       
         this.children = [header, todoList, footer];
 
@@ -147,13 +185,11 @@ module TodoMVC {
     export class Base {
 
       childNode : any   = null;
-      children : any[]  = [];
+      children  : any[] = [];
+      root      : any   = null;
 
-      update(parent : any) : void {
-        this.render(parent);
-        for (var i = 0, l = this.children.length; i < l; i++) {
-          this.children[i].update(this.childNode);
-        }
+      renderWithRoot() : void {
+        this.render(this.root);
       }
 
       render(parent : any) : void {
@@ -166,21 +202,42 @@ module TodoMVC {
       todo : Model.Todo = null;
 
       render(parent : any) : void {
-        var attrs = this.todo.attributes;
+        var attrs = this.todo.attributes();
         var element = document.createElement('li');
         if (attrs.completed) {
           element.className = 'complete';
         }
-        element.innerHTML = attrs.title;
-
+        element.innerHTML = this.html(attrs.title, attrs.completed);
         parent.appendChild(element);
+      }
+
+      html(title : string, completed : bool) : string {
+        var checked = completed ? 'checked' : '';
+
+        var html = '<div class="view">';
+        html    += '  <input class="toggle" type="checkbox" ' + checked + '>';
+        html    += '  <label>' + title + '</label>';
+        html    += '  <button class="destroy"></button>';
+        html    += '</div>';
+        html    += '<input class="edit" value="' + title + '">';
+
+        return html;
       }
     }
 
     export class TodoList extends Base {
 
-      render(parent : any) : void {
+      root = document.getElementById('todo-list');
 
+      render(parent : any) : void {
+        this.root.innerHTML = '';
+        var Todos = Store.Todos;
+        for (var i = 0, l = Todos.length(); i < l; i++) {
+          var todo = Todos.atIndex(i);
+          var todoView = new Todo();
+          todoView.todo = todo;
+          todoView.render(this.root);
+        }
       }
     }
   }
@@ -188,7 +245,8 @@ module TodoMVC {
   export class Application {
     run() : void {
       var rootController = new Controller.Root();
-      rootController.display()
+      rootController.init();
+      rootController.display();
     }
   }
 }
